@@ -4,7 +4,7 @@ const supertest = require('supertest');
 const sinon = require('sinon');
 const testUtils = require('../../utils');
 const localUtils = require('./utils');
-const config = require('../../../core/server/config');
+const config = require('../../../core/shared/config');
 const labs = require('../../../core/server/services/labs');
 
 const ghost = testUtils.startGhost;
@@ -70,6 +70,26 @@ describe('Members API', function () {
                 should.exist(jsonResponse);
                 should.exist(jsonResponse.members);
                 jsonResponse.members.should.have.length(1);
+                localUtils.API.checkResponse(jsonResponse, 'members');
+                localUtils.API.checkResponse(jsonResponse.members[0], 'member', 'stripe');
+                localUtils.API.checkResponse(jsonResponse.meta.pagination, 'pagination');
+            });
+    });
+
+    it('Can browse with search', function () {
+        return request
+            .get(localUtils.API.getApiQuery('members/?search=member1'))
+            .set('Origin', config.get('url'))
+            .expect('Content-Type', /json/)
+            .expect('Cache-Control', testUtils.cacheRules.private)
+            .expect(200)
+            .then((res) => {
+                should.not.exist(res.headers['x-cache-invalidate']);
+                const jsonResponse = res.body;
+                should.exist(jsonResponse);
+                should.exist(jsonResponse.members);
+                jsonResponse.members.should.have.length(1);
+                jsonResponse.members[0].email.should.equal('member1@test.com');
                 localUtils.API.checkResponse(jsonResponse, 'members');
                 localUtils.API.checkResponse(jsonResponse.members[0], 'member', 'stripe');
                 localUtils.API.checkResponse(jsonResponse.meta.pagination, 'pagination');
@@ -254,6 +274,28 @@ describe('Members API', function () {
                 jsonResponse.meta.stats.imported.should.equal(2);
                 jsonResponse.meta.stats.duplicates.should.equal(0);
                 jsonResponse.meta.stats.invalid.should.equal(0);
+            });
+    });
+
+    it('Can fetch stats', function () {
+        return request
+            .get(localUtils.API.getApiQuery('members/stats/'))
+            .set('Origin', config.get('url'))
+            .expect('Content-Type', /json/)
+            .expect('Cache-Control', testUtils.cacheRules.private)
+            .expect(200)
+            .then((res) => {
+                should.not.exist(res.headers['x-cache-invalidate']);
+                const jsonResponse = res.body;
+
+                should.exist(jsonResponse);
+                should.exist(jsonResponse.total);
+                should.exist(jsonResponse.total_in_range);
+                should.exist(jsonResponse.total_on_date);
+                should.exist(jsonResponse.new_today);
+
+                // 2 from fixtures, 2 from above posts, 2 from above import
+                jsonResponse.total.should.equal(6);
             });
     });
 });
